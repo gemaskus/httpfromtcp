@@ -13,6 +13,7 @@ func main() {
 	//	var fileName string = "messages.txt"
 
 	listener, err := net.Listen("tcp", ":42069")
+	defer listener.Close()
 	if err != nil {
 		log.Fatalf("Could not create TCP listener: %v", err)
 	}
@@ -30,8 +31,6 @@ func main() {
 		}
 
 	}
-
-	listener.Close()
 }
 
 func getLinesChannel(f io.ReadCloser) <-chan string {
