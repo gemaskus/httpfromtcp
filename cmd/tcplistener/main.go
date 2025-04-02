@@ -67,7 +67,6 @@ func getLinesChannel(f io.ReadCloser) <-chan string {
 		}
 		f.Close()
 		close(fileChannel)
-		fmt.Printf("Channel is closed\n")
 	}()
 
 	return fileChannel
