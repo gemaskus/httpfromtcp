@@ -2,9 +2,9 @@ package request
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"unicode"
 )
@@ -22,6 +22,7 @@ type RequestLine struct {
 }
 
 const crlf = "\r\n"
+const bufferSize = 8
 
 type requestState int
 
@@ -31,38 +32,85 @@ const (
 )
 
 func RequestfromReader(reader io.Reader) (*Request, error) {
+	buf := make([]byte, bufferSize)
 
-	requestString, err := io.ReadAll(reader)
-	if err != nil {
-		log.Fatalf("Could not read the request from the io.reader: %v", err)
+	readToIndex := 0
+
+	request := Request{
+		state: requestStateInitialized,
 	}
 
-	requestLine, err := parseRequestLine(requestString)
-	if err != nil {
-		return nil, err
+	for request.state != requestStateDone {
+		if readToIndex >= len(buf) {
+			newBuf := make([]byte, len(buf)*2)
+			copy(newBuf, buf)
+			buf = newBuf
+		}
+
+		numBytesRead, err := reader.Read(buf[readToIndex:])
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				request.state = requestStateDone
+				break
+			}
+			return nil, err
+		}
+		readToIndex += numBytesRead
+
+		numBytesParsed, err := request.parse(buf[:readToIndex])
+		if err != nil {
+			return nil, err
+		}
+
+		copy(buf, buf[numBytesParsed:])
+		readToIndex -= numBytesParsed
 	}
-	return &Request{
-		RequestLine: *requestLine,
-	}, nil
+
+	return &request, nil
 }
 
-func parseRequestLine(data []byte) (*RequestLine, error) {
+func (r *Request) parse(data []byte) (int, error) {
+	switch r.state {
+	case requestStateInitialized:
+		reqLine, numBytes, err := parseRequestLine(data)
+		if err != nil {
+			return 0, err
+		}
+		if numBytes == 0 && err == nil {
+			return 0, nil
+		}
+		r.RequestLine = *reqLine
+		r.state = requestStateDone
+		return numBytes, nil
+	case requestStateDone:
+		return 0, fmt.Errorf("Error: parser trying to read data from done state")
+	default:
+		return 0, fmt.Errorf("Error: unknown parser state")
+	}
+}
+
+func parseRequestLine(data []byte) (*RequestLine, int, error) {
 	idx := bytes.Index(data, []byte(crlf))
 	if idx == -1 {
-		return nil, fmt.Errorf("Could not find CRLF in request-line")
+		return nil, 0, nil
 	}
 
 	requestLineText := string(data[:idx])
 	requestLine, err := requestLineFromString(requestLineText)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return requestLine, nil
+	return requestLine, len(requestLineText), nil
 }
 
 func requestLineFromString(str string) (*RequestLine, error) {
 	parts := strings.Split(str, " ")
+	fmt.Printf("number of parts: %d\n", len(parts))
+	for part := range parts {
+		fmt.Println(part)
+	}
 	if len(parts) != 3 {
+
 		return nil, fmt.Errorf("poorly formatted request-line: %s", str)
 	}
 	method := parts[0]
