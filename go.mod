@@ -1,4 +1,4 @@
-module github.com/gemaskus
+module github.com/gemaskus/httpfromtcp
 
 go 1.23.0
 

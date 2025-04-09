@@ -105,10 +105,6 @@ func parseRequestLine(data []byte) (*RequestLine, int, error) {
 
 func requestLineFromString(str string) (*RequestLine, error) {
 	parts := strings.Split(str, " ")
-	fmt.Printf("number of parts: %d\n", len(parts))
-	for part := range parts {
-		fmt.Println(part)
-	}
 	if len(parts) != 3 {
 
 		return nil, fmt.Errorf("poorly formatted request-line: %s", str)
